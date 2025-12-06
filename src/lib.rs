@@ -1,6 +1,6 @@
-mod config;
 
-use std::io::Write;
+
+use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::task::Context;
 
@@ -39,59 +39,71 @@ pub fn new_server(url: impl Into<String>) -> Result<NetHandler, String> {
     })
 }
 pub fn send_message<T: bincode::Encode>(
-    mut message_handel: NetHandler,
+    handler: &mut NetHandler,
     content: T,
 ) -> Result<(), String> {
     let config = bincode::config::standard().with_big_endian();
-    let encoded_content = match bincode::encode_to_vec(content, config) {
-        Ok(content) => content,
-        Err(e) => return Err(format!("Failed to encode Content: {:?}", e)),
-    };
-    let total_len = encoded_content.len() as u32;
-    let len_bytes = total_len.to_be_bytes();
+    let encoded = bincode::encode_to_vec(content, config)
+        .map_err(|e| format!("encode error: {:?}", e))?;
 
-    if let Some(stream) = message_handel.stream.as_mut() {
-        match stream.write_all(&len_bytes) {
-            Ok(_) => {}
-            Err(e) => return Err(format!("Failed to write to socket: {:?}", e)),
-        };
-        match stream.write_all(&encoded_content) {
-            Ok(_) => {}
-            Err(e) => return Err(format!("Failed to write to socket: {:?}", e)),
-        };
-    } else {
-        return Err("Kein Stream vorhanden".into());
-    }
+    let len = (encoded.len() as u32).to_be_bytes();
+
+    let stream = handler.stream.as_mut().ok_or("no stream")?;
+
+    stream.write_all(&len).map_err(|e| e.to_string())?;
+    stream.write_all(&encoded).map_err(|e| e.to_string())?;
 
     Ok(())
 }
 
+
 /*pub fn reading_message<'a, T: bincode::Decode<Context<'a>>>(net_handler: NetHandler) -> Result<T, String> {
 
 }*/
-pub fn run_fn_manage_data_on_server<'a, T: bincode::Decode<Context<'a>>>(
+pub fn run_fn_manage_data_on_server<T: for<'a> bincode::Decode<Context>>(
     f: fn(T),
-    content: T,
-    net_handler: NetHandler,
+    handler: NetHandler,
 ) -> Result<(), String> {
-    for stream_result in net_handler
-        .listener
-        .expect("Failed reading acessind handler")
-        .incoming()
-    {
-        match stream_result {
-            Ok(stream) => {
-                // Spawn für jede Verbindung
-                let net_handler_stream = NetHandler {
-                    stream: Option::from(stream),
-                    listener: None,
-                };
-                std::thread::spawn(move || loop {
-                    
+    let listener = handler.listener.ok_or("no listener")?;
+
+    for stream in listener.incoming() {
+        match stream {
+            Ok(mut s) => {
+                std::thread::spawn(move || {
+                    loop {
+                        // ---- 1. Länge lesen ----
+                        let mut len_buf = [0u8; 4];
+                        if let Err(e) = s.read_exact(&mut len_buf) {
+                            eprintln!("Failed to read len: {}", e);
+                            break;
+                        }
+                        let needed = u32::from_be_bytes(len_buf) as usize;
+
+                        // ---- 2. Payload lesen ----
+                        let mut buf = vec![0u8; needed];
+                        if let Err(e) = s.read_exact(&mut buf) {
+                            eprintln!("Failed to read payload: {}", e);
+                            break;
+                        }
+
+                        // ---- 3. Dekodieren ----
+                        let config = bincode::config::standard().with_big_endian();
+                        let decoded: T = match bincode::decode_from_slice(&buf, config) {
+                            Ok((value, _)) => value,
+                            Err(e) => {
+                                eprintln!("Decode failed: {:?}", e);
+                                continue;
+                            }
+                        };
+
+                        // ---- 4. Callback ausführen ----
+                        f(decoded);
+                    }
                 });
             }
-            Err(e) => eprintln!("Accept failed: {e}"),
+            Err(e) => eprintln!("Accept failed: {}", e),
         }
     }
+
     Ok(())
 }
