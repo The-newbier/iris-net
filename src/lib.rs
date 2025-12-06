@@ -1,5 +1,9 @@
+mod config;
+
 use std::io::Write;
 use std::net::{TcpListener, TcpStream};
+use std::task::Context;
+
 pub struct NetHandler {
     pub stream: Option<TcpStream>,
     pub listener: Option<TcpListener>,
@@ -51,13 +55,43 @@ pub fn send_message<T: bincode::Encode>(
             Ok(_) => {}
             Err(e) => return Err(format!("Failed to write to socket: {:?}", e)),
         };
-        match stream.write_all(&encoded_content){
+        match stream.write_all(&encoded_content) {
             Ok(_) => {}
             Err(e) => return Err(format!("Failed to write to socket: {:?}", e)),
-        };;
+        };
     } else {
         return Err("Kein Stream vorhanden".into());
     }
 
+    Ok(())
+}
+
+/*pub fn reading_message<'a, T: bincode::Decode<Context<'a>>>(net_handler: NetHandler) -> Result<T, String> {
+
+}*/
+pub fn run_fn_manage_data_on_server<'a, T: bincode::Decode<Context<'a>>>(
+    f: fn(T),
+    content: T,
+    net_handler: NetHandler,
+) -> Result<(), String> {
+    for stream_result in net_handler
+        .listener
+        .expect("Failed reading acessind handler")
+        .incoming()
+    {
+        match stream_result {
+            Ok(stream) => {
+                // Spawn für jede Verbindung
+                let net_handler_stream = NetHandler {
+                    stream: Option::from(stream),
+                    listener: None,
+                };
+                std::thread::spawn(move || loop {
+                    
+                });
+            }
+            Err(e) => eprintln!("Accept failed: {e}"),
+        }
+    }
     Ok(())
 }
