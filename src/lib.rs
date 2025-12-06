@@ -60,8 +60,8 @@ pub fn send_message<T: bincode::Encode>(
 /*pub fn reading_message<'a, T: bincode::Decode<Context<'a>>>(net_handler: NetHandler) -> Result<T, String> {
 
 }*/
-pub fn run_fn_manage_data_on_server<T: for<'a> bincode::Decode<Context>>(
-    f: fn(T),
+pub fn registered_fn_manage_data_on_server<T: for<'a> bincode::Decode<Context>>(
+    f: fn(T, NetHandler),
     handler: NetHandler,
 ) -> Result<(), String> {
     let listener = handler.listener.ok_or("no listener")?;
@@ -97,7 +97,10 @@ pub fn run_fn_manage_data_on_server<T: for<'a> bincode::Decode<Context>>(
                         };
 
                         // ---- 4. Callback ausführen ----
-                        f(decoded);
+                        f(decoded, NetHandler {
+                            stream: Some(s),
+                            ..Default::default()
+                        });
                     }
                 });
             }
