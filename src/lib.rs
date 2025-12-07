@@ -52,7 +52,7 @@ pub fn send_message<T: bincode::Encode>(
     match stream.flush() {
         Ok(_) => Ok(()),
         Err(e) => Err(format!("Failed to Flush{}",e.to_string())),
-    }.expect("");
+    }?;
     Ok(())
 }
 
