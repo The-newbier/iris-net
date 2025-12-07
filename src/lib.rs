@@ -51,30 +51,35 @@ pub fn send_message<T: bincode::Encode>(
     stream.write_all(&encoded).map_err(|e| e.to_string())?;
     match stream.flush() {
         Ok(_) => Ok(()),
-        Err(e) => Err(format!("Failed to Flush{}",e.to_string())),
+        Err(e) => Err(format!("Failed to Flush{}", e.to_string())),
     }?;
     Ok(())
 }
 
-pub fn read_message<'a, T: bincode::Decode<()>>(
-    net_handler: &mut NetHandler,
-) -> Result<T, String> {
+pub fn read_message<'a, T: bincode::Decode<()>>(net_handler: &mut NetHandler) -> Result<T, String> {
     let stream = net_handler.stream.as_mut().ok_or("no stream available")?;
 
+    let mut buf = [0u8; 4];
+    let mut read = 0;
 
-    let mut len_buf = [0u8; 4];
-    stream
-        .read_exact(&mut len_buf)
-        .map_err(|e| format!("Failed reading length: {}", e))?;
-
-    let expected = u32::from_be_bytes(len_buf) as usize;
-
-
+    while read < 4 {
+        match stream.read(&mut buf[read..]) {
+            Ok(0) => return Err("connection closed while reading length".into()),
+            Ok(n) => read += n,
+            Err(e) => return Err(format!("io error while reading length: {}", e)),
+        }
+    }
+    let expected = u32::from_be_bytes(buf) as usize;
     let mut buf = vec![0u8; expected];
-    stream
-        .read_exact(&mut buf)
-        .map_err(|e| format!("Failed reading payload: {}", e))?;
+    let mut read = 0;
 
+    while read < expected {
+        match stream.read(&mut buf[read..]) {
+            Ok(0) => return Err("connection closed while reading payload".into()),
+            Ok(n) => read += n,
+            Err(e) => return Err(format!("io error while reading payload: {}", e)),
+        }
+    }
 
     let config = bincode::config::standard().with_big_endian();
     let (decoded, _bytes_read) =
@@ -84,30 +89,35 @@ pub fn read_message<'a, T: bincode::Decode<()>>(
 }
 pub fn registered_fn_manage_data_on_server<T: bincode::Decode<()> + bincode::Encode + 'static>(
     f: fn(T) -> T,
-    handler: NetHandler,
+    mut handler: NetHandler,
 ) -> Result<(), String> {
-    let listener = handler.listener.ok_or("no listener")?;
+    let listener = handler.listener.take().ok_or("no listener")?;
 
     for stream in listener.incoming() {
         match stream {
             Ok(s) => {
-
-                println!("new connection: {}", s.local_addr().unwrap());
+                println!("New connection: {}", s.peer_addr().unwrap());
                 std::thread::spawn(move || {
-                    let mut handler = NetHandler {
+                    let mut h = NetHandler {
                         stream: Some(s),
                         listener: None,
                     };
+
                     loop {
-                        let r: T = match read_message(&mut handler) {
-                            Ok(v) => v,
+                        let msg = match read_message::<T>(&mut h) {
+                            Ok(m) => m,
                             Err(e) => {
-                                eprintln!("read error: {}", e);
+                                eprintln!("Read error: {}", e);
                                 break;
                             }
                         };
-                        let response= f(r);
-                        send_message(&mut handler, response).unwrap();
+
+                        let reply = f(msg);
+
+                        if let Err(e) = send_message(&mut h, reply) {
+                            eprintln!("Send error: {}", e);
+                            break;
+                        }
                     }
                 });
             }
@@ -116,4 +126,16 @@ pub fn registered_fn_manage_data_on_server<T: bincode::Decode<()> + bincode::Enc
     }
 
     Ok(())
+}
+
+pub fn close_net_handel(handler: &mut NetHandler) -> Result<NetHandler, String> {
+    let stream = handler.stream.as_mut().ok_or("No stream available")?;
+
+    stream.flush().map_err(|e| format!("Flush failed: {}", e))?;
+    stream
+        .shutdown(std::net::Shutdown::Both)
+        .map_err(|e| format!("Shutdown failed: {}", e))?;
+    Ok(NetHandler {
+        ..Default::default()
+    })
 }

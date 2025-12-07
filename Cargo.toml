@@ -1,6 +1,6 @@
 [package]
 name = "iris_net"
-version = "0.2.2"
+version = "0.2.7"
 edition = "2024"
 authors = ["The-newbier"]
 description = "`iris_net` simplifies networking, eliminating the need to worry about server-side performance, buffers, and compression."
