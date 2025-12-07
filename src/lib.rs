@@ -49,7 +49,10 @@ pub fn send_message<T: bincode::Encode>(
 
     stream.write_all(&len).map_err(|e| e.to_string())?;
     stream.write_all(&encoded).map_err(|e| e.to_string())?;
-
+    match stream.flush() {
+        Ok(_) => Ok(()),
+        Err(e) => Err(format!("Failed to Flush{}",e.to_string())),
+    }.expect("");
     Ok(())
 }
 
