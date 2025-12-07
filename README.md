@@ -10,17 +10,17 @@ cargo add iris_net bincode
 ````rust
 use iris_net::*;
 fn main() {
-    let net_handler = new_server("ws://127.0.0.1");
-    registered_fn_manage_data_on_server(manage_data, net_handler);
+    let net_handler = new_server("127.0.0.1:5000").expect("Failed to create server");
+    registered_fn_manage_data_on_server(manage_data, net_handler).expect("Failed to register data manager");
 }
-#[derive(bincode::Encode, bincode::Decode)]
+#[derive(bincode::Encode, bincode::Decode, Debug)]
 struct Message {
     text: String,
 }
 
-fn manage_data(msg: Message) {
+fn manage_data(msg: Message) -> Message {
     println!("Client Response: {:?}", msg);
-    return Message { text: "Pong".to_string() };
+    Message { text: "Pong".to_string() }
 }
 ````
 ### Client
