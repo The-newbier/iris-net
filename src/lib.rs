@@ -1,8 +1,5 @@
-
-
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::task::Context;
 
 pub struct NetHandler {
     pub stream: Option<TcpStream>,
@@ -43,8 +40,8 @@ pub fn send_message<T: bincode::Encode>(
     content: T,
 ) -> Result<(), String> {
     let config = bincode::config::standard().with_big_endian();
-    let encoded = bincode::encode_to_vec(content, config)
-        .map_err(|e| format!("encode error: {:?}", e))?;
+    let encoded =
+        bincode::encode_to_vec(content, config).map_err(|e| format!("encode error: {:?}", e))?;
 
     let len = (encoded.len() as u32).to_be_bytes();
 
@@ -56,51 +53,58 @@ pub fn send_message<T: bincode::Encode>(
     Ok(())
 }
 
+pub fn read_message<'a, T: bincode::Decode<()>>(
+    net_handler: &mut NetHandler,
+) -> Result<T, String> {
+    let stream = net_handler.stream.as_mut().ok_or("no stream available")?;
 
-/*pub fn reading_message<'a, T: bincode::Decode<Context<'a>>>(net_handler: NetHandler) -> Result<T, String> {
 
-}*/
-pub fn registered_fn_manage_data_on_server<T: for<'a> bincode::Decode<Context>>(
-    f: fn(T, NetHandler),
+    let mut len_buf = [0u8; 4];
+    stream
+        .read_exact(&mut len_buf)
+        .map_err(|e| format!("Failed reading length: {}", e))?;
+
+    let expected = u32::from_be_bytes(len_buf) as usize;
+
+
+    let mut buf = vec![0u8; expected];
+    stream
+        .read_exact(&mut buf)
+        .map_err(|e| format!("Failed reading payload: {}", e))?;
+
+
+    let config = bincode::config::standard().with_big_endian();
+    let (decoded, _bytes_read) =
+        bincode::decode_from_slice(&buf, config).map_err(|e| format!("Decode error: {:?}", e))?;
+
+    Ok(decoded)
+}
+pub fn registered_fn_manage_data_on_server<T: bincode::Decode<()> + bincode::Encode + 'static>(
+    f: fn(T) -> T,
     handler: NetHandler,
 ) -> Result<(), String> {
     let listener = handler.listener.ok_or("no listener")?;
 
     for stream in listener.incoming() {
         match stream {
-            Ok(mut s) => {
+            Ok(s) => {
+
+                println!("new connection: {}", s.local_addr().unwrap());
                 std::thread::spawn(move || {
+                    let mut handler = NetHandler {
+                        stream: Some(s),
+                        listener: None,
+                    };
                     loop {
-                        // ---- 1. Länge lesen ----
-                        let mut len_buf = [0u8; 4];
-                        if let Err(e) = s.read_exact(&mut len_buf) {
-                            eprintln!("Failed to read len: {}", e);
-                            break;
-                        }
-                        let needed = u32::from_be_bytes(len_buf) as usize;
-
-                        // ---- 2. Payload lesen ----
-                        let mut buf = vec![0u8; needed];
-                        if let Err(e) = s.read_exact(&mut buf) {
-                            eprintln!("Failed to read payload: {}", e);
-                            break;
-                        }
-
-                        // ---- 3. Dekodieren ----
-                        let config = bincode::config::standard().with_big_endian();
-                        let decoded: T = match bincode::decode_from_slice(&buf, config) {
-                            Ok((value, _)) => value,
+                        let r: T = match read_message(&mut handler) {
+                            Ok(v) => v,
                             Err(e) => {
-                                eprintln!("Decode failed: {:?}", e);
-                                continue;
+                                eprintln!("read error: {}", e);
+                                break;
                             }
                         };
-
-                        // ---- 4. Callback ausführen ----
-                        f(decoded, NetHandler {
-                            stream: Some(s),
-                            ..Default::default()
-                        });
+                        let response= f(r);
+                        send_message(&mut handler, response).unwrap();
                     }
                 });
             }
