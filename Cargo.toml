@@ -5,6 +5,10 @@ edition = "2024"
 authors = ["The-newbier"]
 description = "`iris_net` simplifies networking, eliminating the need to worry about server-side performance, buffers, and compression."
 license = "MIT"
+categories = [
+    "network-programming",
+    "web-programming",
+    "web-programming::http-server"]
 
 [dependencies]
 bincode = "2.0.1"
