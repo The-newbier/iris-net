@@ -5,6 +5,9 @@ It's also things like Compression or multithreading for optimization.
 ```shell
 cargo add iris_net bincode
 ```
+## Github
+[https://github.com/The-newbier/iris-net](https://github.com/The-newbier/iris-net)
+
 ## Example
 ### Server
 ````rust
@@ -40,6 +43,7 @@ fn main() {
         match read_message::<Message>(&mut net_handler) {
             Ok(msg) => {
                 println!("Server responded with: {}", msg.text);
+                close_net_handel(&mut net_handler);
                 break;
             }
             Err(e) => {
