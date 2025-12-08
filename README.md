@@ -11,39 +11,59 @@ cargo add iris_net bincode
 ## Example
 ### Server
 ````rust
+use iris_net::config::IrisConfig;
 use iris_net::*;
+
 fn main() {
-    let net_handler = new_server("127.0.0.1:5000").expect("Failed to create server");
-    registered_fn_manage_data_on_server(manage_data, net_handler).expect("Failed to register data manager");
+    //Creating new Server
+    let config = IrisConfig::default();
+    let net_handler =
+        NetHandler::new_server(config, "127.0.0.1:5000").expect("Failed to create server");
+    //register manage_data so that it can be multithreaded by the api
+    registered_fn_manage_data_on_server(manage_data, net_handler)
+        .expect("Failed to register data manager");
 }
+
+//Message Format
 #[derive(bincode::Encode, bincode::Decode, Debug)]
 struct Message {
     text: String,
 }
 
+//Function for managing data. It needs to return the same type as the Function has got 
 fn manage_data(msg: Message) -> Message {
     println!("Client Response: {:?}", msg);
-    Message { text: "Pong".to_string() }
+    Message {
+        text: "Pong".to_string(),
+    }
 }
 ````
 ### Client
 ````rust
+use iris_net::config::{IrisConfig};
 use iris_net::*;
 
 fn main() {
-    let mut net_handler = new_client("127.0.0.1:5000").expect("Failed to connect to server");
+    //Creating Client
+    let config = IrisConfig::default();
+    let mut net_handler =
+        NetHandler::new_client(config, "127.0.0.1:5000").expect("Failed to connect to server");
+    //Sending Message in the Format-Type `Message`-Struct
     send_message(
         &mut net_handler,
         Message {
             text: "Ping".to_string(),
         },
-    ).expect("Failed to send message");
+    )
+        .expect("Failed to send message");
+    //Waiting for Server Response
     loop {
-
         match read_message::<Message>(&mut net_handler) {
             Ok(msg) => {
                 println!("Server responded with: {}", msg.text);
-                close_net_handel(&mut net_handler);
+                //Shutting down Handel 
+                NetHandler::close_handel(&mut net_handler).expect("Failed to close handel");
+                //exiting Loop and program
                 break;
             }
             Err(e) => {
@@ -53,8 +73,11 @@ fn main() {
         }
     }
 }
+
+//Message-Format
 #[derive(bincode::Encode, bincode::Decode)]
 struct Message {
     text: String,
 }
+
 ````
