@@ -1,6 +1,9 @@
+/// This is are Settings how the Message will be encoded, decoded and send
 #[derive(Copy, Clone)]
 pub struct IrisNetworkConfig {
+    /// This says how the message is formated
     pub endian: Endian,
+    /// This says how big the Buffer-Limit is
     pub size: SizeType,
 }
 

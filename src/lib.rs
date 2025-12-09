@@ -11,6 +11,7 @@ pub struct NetHandler {
 }
 
 impl NetHandler {
+    /// creates a new Client and returns a Network handle or an Error
     pub fn new_client(config: IrisNetworkConfig, url: impl Into<String>) -> Result<NetHandler, String> {
         let stream = match TcpStream::connect(url.into()) {
             Ok(stream) => stream,
@@ -22,6 +23,7 @@ impl NetHandler {
             config,
         })
     }
+    /// creates a new Server and returns a Network handle or an Error
     pub fn new_server(config: IrisNetworkConfig, url: impl Into<String>) -> Result<NetHandler, String> {
         let bind = match TcpListener::bind(url.into()) {
             Ok(stream) => stream,
@@ -33,6 +35,7 @@ impl NetHandler {
             config,
         })
     }
+    /// Closes the Connection between Server and Client
     pub fn close_handel(net_handler: &mut Self) -> Result<(), String> {
         let stream = net_handler.stream.as_mut().ok_or("No stream available")?;
 
@@ -43,7 +46,7 @@ impl NetHandler {
         Ok(())
     }
 }
-
+/// This Function sends Messages
 pub fn send_message<T: bincode::Encode + Clone>(
     net_handler: &mut NetHandler,
     content: T,
@@ -96,8 +99,8 @@ pub fn send_message<T: bincode::Encode + Clone>(
     }?;
     Ok(())
 }
-
-pub fn read_message<'a, T: bincode::Decode<()>>(net_handler: &mut NetHandler) -> Result<T, String> {
+/// This Function reads if there are any Messages in the Inbox
+pub fn read_message<'a, T: bincode::Decode<()>>(net_handler: &mut NetHandler) -> Result<Option<T>, String> {
     let stream = net_handler.stream.as_mut().ok_or("No Stream available")?;
     let mut buf_u16 = [0u8; 2];
     let mut buf_u32 = [0u8; 4];
@@ -113,7 +116,7 @@ pub fn read_message<'a, T: bincode::Decode<()>>(net_handler: &mut NetHandler) ->
         };
 
         match stream.read(&mut buf[read..]) {
-            Ok(0) => return Err("Connection closed while reading length".into()),
+            Ok(0) => return Ok(None),
             Ok(n) => read += n,
             Err(e) => return Err(format!("IO Error while reading length: {}", e)),
         }
@@ -133,7 +136,7 @@ pub fn read_message<'a, T: bincode::Decode<()>>(net_handler: &mut NetHandler) ->
 
     while read < expected {
         match stream.read(&mut buf[read..]) {
-            Ok(0) => return Err("Connection closed while reading payload".into()),
+            Ok(0) => return Ok(None),
             Ok(n) => read += n,
             Err(e) => return Err(format!("IO error while reading payload: {}", e)),
         }
@@ -154,10 +157,41 @@ pub fn read_message<'a, T: bincode::Decode<()>>(net_handler: &mut NetHandler) ->
         }
     };
 
-    Ok(decoded)
+    Ok(Some(decoded))
 }
+/// You register a Function, that will be running for each client in a separate Thread
+/// You need also to register the Content-Format you're working with
+/// Example:
+/// ```
+/// use iris_net::*;
+/// use iris_net::config::IrisNetworkConfig;
+///
+/// fn main() {
+///     //Creating new Server
+///     let config = IrisNetworkConfig::default();
+///     let net_handler =
+///         NetHandler::new_server(config, "127.0.0.1:5000").expect("Failed to create server");
+///     //register manage_data so that it can be multithreaded by the api
+///     registered_fn_manage_data_on_server(manage_data, net_handler)
+///         .expect("Failed to register data manager");
+/// }
+///
+/// //Message Format
+/// #[derive(bincode::Encode, bincode::Decode, Debug, Clone)]
+/// struct Message {
+///     text: String,
+/// }
+///
+/// //Function for managing data. It needs to return the same type as the Function has got
+/// fn manage_data(msg: Message) -> Message {
+///     println!("Client Response: {:?}", msg);
+///     Message {
+///         text: "Pong".to_string(),
+///     }
+/// }
+/// ```
 pub fn registered_fn_manage_data_on_server<
-    T: bincode::Decode<()> + bincode::Encode + 'static + Clone,
+    T: bincode::Decode<()> + bincode::Encode + 'static + Clone + PartialEq
 >(
     f: fn(T) -> T,
     mut handler: NetHandler,
@@ -182,8 +216,8 @@ pub fn registered_fn_manage_data_on_server<
                                 break;
                             }
                         };
-
-                        let reply = f(msg);
+                        if msg == None { break; }
+                        let reply = f(msg.expect("Failed to unwrap"));
 
                         if let Err(e) = send_message(&mut h, reply) {
                             eprintln!("Send error: {}", e);
