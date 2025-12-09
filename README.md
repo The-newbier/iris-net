@@ -1,6 +1,7 @@
 # The Iris-Network Crate
 This Network provides some Network Functions to ease the use of networks in Rust.
 It's also does things like Compression or multithreading for optimization.
+
 ## Install
 ```shell
 cargo add iris_net bincode
@@ -11,12 +12,12 @@ cargo add iris_net bincode
 ## Example
 ### Server
 ````rust
-use iris_net::config::IrisConfig;
 use iris_net::*;
+use iris_net::config::IrisNetworkConfig;
 
 fn main() {
     //Creating new Server
-    let config = IrisConfig::default();
+    let config = IrisNetworkConfig::default();
     let net_handler =
         NetHandler::new_server(config, "127.0.0.1:5000").expect("Failed to create server");
     //register manage_data so that it can be multithreaded by the api
@@ -25,12 +26,12 @@ fn main() {
 }
 
 //Message Format
-#[derive(bincode::Encode, bincode::Decode, Debug)]
+#[derive(bincode::Encode, bincode::Decode, Debug, Clone)]
 struct Message {
     text: String,
 }
 
-//Function for managing data. It needs to return the same type as the Function has got 
+//Function for managing data. It needs to return the same type as the Function has got
 fn manage_data(msg: Message) -> Message {
     println!("Client Response: {:?}", msg);
     Message {
@@ -40,12 +41,12 @@ fn manage_data(msg: Message) -> Message {
 ````
 ### Client
 ````rust
-use iris_net::config::{IrisConfig};
+use iris_net::config::IrisNetworkConfig;
 use iris_net::*;
 
 fn main() {
     //Creating Client
-    let config = IrisConfig::default();
+    let config = IrisNetworkConfig::default();
     let mut net_handler =
         NetHandler::new_client(config, "127.0.0.1:5000").expect("Failed to connect to server");
     //Sending Message in the Format-Type `Message`-Struct
@@ -61,7 +62,7 @@ fn main() {
         match read_message::<Message>(&mut net_handler) {
             Ok(msg) => {
                 println!("Server responded with: {}", msg.text);
-                //Shutting down Handel 
+                //Shutting down Handel
                 NetHandler::close_handel(&mut net_handler).expect("Failed to close handel");
                 //exiting Loop and program
                 break;
@@ -75,7 +76,7 @@ fn main() {
 }
 
 //Message-Format
-#[derive(bincode::Encode, bincode::Decode)]
+#[derive(bincode::Encode, bincode::Decode, Clone)]
 struct Message {
     text: String,
 }

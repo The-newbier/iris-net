@@ -1,12 +1,14 @@
 #[derive(Copy, Clone)]
-pub struct IrisConfig {
+pub struct IrisNetworkConfig {
     pub endian: Endian,
+    pub size: SizeType,
 }
 
-impl Default for IrisConfig {
+impl Default for IrisNetworkConfig {
     fn default() -> Self {
-        IrisConfig {
+        Self {
             endian: Default::default(),
+            size: Default::default(),
         }
     }
 }
@@ -17,18 +19,10 @@ pub enum Endian {
     Little,
     Big,
 }
-
-pub enum HeaderType {
+#[derive(Default, PartialEq, Clone, Copy)]
+pub enum SizeType {
     U16,
+    #[default]
     U32,
-    U64
+    U64,
 }
-
-/*fn get_bincode_config(config: IrisConfig) -> impl bincode::config::Config {
-    let cfg = bincode::config::standard();
-
-    match config.endian {
-        Endian::Big => cfg.with_big_endian(),
-        Endian::Little => cfg.with_little_endian(),
-    }
-}*/
