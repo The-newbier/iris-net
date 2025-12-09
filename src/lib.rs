@@ -1,7 +1,6 @@
 pub mod config;
 
 use crate::config::{Endian, IrisNetworkConfig, SizeType};
-use bincode::{Decode, Encode};
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 
@@ -64,21 +63,32 @@ pub fn send_message<T: bincode::Encode + Clone>(
         }
     };
 
-    let len = match (net_handler.config.endian, net_handler.config.size) {
-        (Endian::Big,    SizeType::U16) => (encoded.len() as u16).to_be_bytes(),
-        (Endian::Little, SizeType::U16) => (encoded.len() as u16).to_le_bytes(),
-
-        (Endian::Big,    SizeType::U32) => (encoded.len() as u32).to_be_bytes(),
-        (Endian::Little, SizeType::U32) => (encoded.len() as u32).to_le_bytes(),
-
-        (Endian::Big,    SizeType::U64) => (encoded.len() as u64).to_be_bytes(),
-        (Endian::Little, SizeType::U64) => (encoded.len() as u64).to_le_bytes(),
+    let len_u16 = match net_handler.config.endian {
+        Endian::Big => (encoded.len() as u16).to_be_bytes(),
+        Endian::Little => (encoded.len() as u16).to_le_bytes(),
+    };
+    let len_u32 = match net_handler.config.endian {
+        Endian::Big => (encoded.len() as u32).to_be_bytes(),
+        Endian::Little => (encoded.len() as u32).to_le_bytes(),
+    };
+    let len_u64 = match net_handler.config.endian {
+        Endian::Big => (encoded.len() as u64).to_be_bytes(),
+        Endian::Little => (encoded.len() as u64).to_le_bytes(),
     };
 
-
     let stream = net_handler.stream.as_mut().ok_or("no stream")?;
+    match net_handler.config.size {
+        SizeType::U16 => {
+            stream.write_all(&len_u16).map_err(|e| e.to_string())?;
+        }
+        SizeType::U32 => {
+            stream.write_all(&len_u32).map_err(|e| e.to_string())?;
+        }
+        SizeType::U64 => {
+            stream.write_all(&len_u64).map_err(|e| e.to_string())?;
+        }
+    };
 
-    stream.write_all(&len).map_err(|e| e.to_string())?;
     stream.write_all(&encoded).map_err(|e| e.to_string())?;
     match stream.flush() {
         Ok(_) => Ok(()),
@@ -109,9 +119,9 @@ pub fn read_message<'a, T: bincode::Decode<()>>(net_handler: &mut NetHandler) ->
         }
     }
     let expected = match (net_handler.config.endian, net_handler.config.size) {
-        (Endian::Big,    SizeType::U16) => u16::from_be_bytes(buf_u16) as usize,
-        (Endian::Big,    SizeType::U32) => u32::from_be_bytes(buf_u32) as usize,
-        (Endian::Big,    SizeType::U64) => u64::from_be_bytes(buf_u64) as usize,
+        (Endian::Big, SizeType::U16) => u16::from_be_bytes(buf_u16) as usize,
+        (Endian::Big, SizeType::U32) => u32::from_be_bytes(buf_u32) as usize,
+        (Endian::Big, SizeType::U64) => u64::from_be_bytes(buf_u64) as usize,
 
         (Endian::Little, SizeType::U16) => u16::from_le_bytes(buf_u16) as usize,
         (Endian::Little, SizeType::U32) => u32::from_le_bytes(buf_u32) as usize,
