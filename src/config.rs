@@ -16,6 +16,11 @@ impl Default for IrisNetworkConfig {
     }
 }
 
+pub enum Protocol {
+    TCP,
+    UDP
+}
+
 #[derive(Default, PartialEq, Clone, Copy)]
 pub enum Endian {
     #[default]

@@ -12,10 +12,13 @@ pub struct NetHandler {
 
 impl NetHandler {
     /// creates a new Client and returns a Network handle or an Error
-    pub fn new_client(config: IrisNetworkConfig, url: impl Into<String>) -> Result<NetHandler, String> {
+    pub fn new_client(
+        config: IrisNetworkConfig,
+        url: impl Into<String>,
+    ) -> Result<NetHandler, String> {
         let stream = match TcpStream::connect(url.into()) {
             Ok(stream) => stream,
-            Err(e) => return Err(e.to_string()),
+            Err(e) => return Err(format!("Could not connect `404`; {}", e.to_string())),
         };
         Ok(Self {
             stream: Option::from(stream),
@@ -24,7 +27,10 @@ impl NetHandler {
         })
     }
     /// creates a new Server and returns a Network handle or an Error
-    pub fn new_server(config: IrisNetworkConfig, url: impl Into<String>) -> Result<NetHandler, String> {
+    pub fn new_server(
+        config: IrisNetworkConfig,
+        url: impl Into<String>,
+    ) -> Result<NetHandler, String> {
         let bind = match TcpListener::bind(url.into()) {
             Ok(stream) => stream,
             Err(e) => return Err("Failed to bind Url".to_string() + &*e.to_string()),
@@ -100,7 +106,9 @@ pub fn send_message<T: bincode::Encode + Clone>(
     Ok(())
 }
 /// This Function reads if there are any Messages in the Inbox
-pub fn read_message<'a, T: bincode::Decode<()>>(net_handler: &mut NetHandler) -> Result<Option<T>, String> {
+pub fn read_message<'a, T: bincode::Decode<()>>(
+    net_handler: &mut NetHandler,
+) -> Result<Option<T>, String> {
     let stream = net_handler.stream.as_mut().ok_or("No Stream available")?;
     let mut buf_u16 = [0u8; 2];
     let mut buf_u32 = [0u8; 4];
@@ -191,7 +199,7 @@ pub fn read_message<'a, T: bincode::Decode<()>>(net_handler: &mut NetHandler) ->
 /// }
 /// ```
 pub fn registered_fn_manage_data_on_server<
-    T: bincode::Decode<()> + bincode::Encode + 'static + Clone + PartialEq
+    T: bincode::Decode<()> + bincode::Encode + 'static + Clone + PartialEq,
 >(
     f: fn(T) -> T,
     mut handler: NetHandler,
@@ -216,7 +224,9 @@ pub fn registered_fn_manage_data_on_server<
                                 break;
                             }
                         };
-                        if msg == None { break; }
+                        if msg == None {
+                            break;
+                        }
                         let reply = f(msg.expect("Failed to unwrap"));
 
                         if let Err(e) = send_message(&mut h, reply) {
@@ -229,6 +239,5 @@ pub fn registered_fn_manage_data_on_server<
             Err(e) => eprintln!("Accept failed: {}", e),
         }
     }
-
     Ok(())
 }
