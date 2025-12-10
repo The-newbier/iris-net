@@ -4,7 +4,7 @@ pub struct IrisNetworkConfig {
     /// This says how the message is formated
     pub endian: Endian,
     /// This says how big the Buffer-Limit is
-    pub size: SizeType,
+    pub size: SizeType
 }
 
 impl Default for IrisNetworkConfig {
@@ -14,11 +14,6 @@ impl Default for IrisNetworkConfig {
             size: Default::default(),
         }
     }
-}
-
-pub enum Protocol {
-    TCP,
-    UDP
 }
 
 #[derive(Default, PartialEq, Clone, Copy)]

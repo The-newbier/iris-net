@@ -13,10 +13,10 @@ cargo add iris_net bincode
 - Server
   - multithreaded
 - Client
+- Auto-Compression
 - Todo:
   - UDP
   - Encryption
-- Auto-Compression
 
 ## Github
 [https://github.com/The-newbier/iris-net](https://github.com/The-newbier/iris-net)
