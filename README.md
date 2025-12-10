@@ -6,6 +6,18 @@ It's also does things like Compression or multithreading for optimization.
 ```shell
 cargo add iris_net bincode
 ```
+
+## Features
+- Protocols
+  - TCP
+- Server
+  - multithreaded
+- Client
+- Todo:
+  - UDP
+  - Encryption
+- Auto-Compression
+
 ## Github
 [https://github.com/The-newbier/iris-net](https://github.com/The-newbier/iris-net)
 
@@ -26,7 +38,7 @@ fn main() {
 }
 
 //Message Format
-#[derive(bincode::Encode, bincode::Decode, Debug, Clone)]
+#[derive(bincode::Encode, bincode::Decode, Debug, Clone, PartialEq)]
 struct Message {
     text: String,
 }
@@ -43,7 +55,6 @@ fn manage_data(msg: Message) -> Message {
 ````rust
 use iris_net::config::IrisNetworkConfig;
 use iris_net::*;
-
 fn main() {
     //Creating Client
     let config = IrisNetworkConfig::default();
@@ -61,7 +72,7 @@ fn main() {
     loop {
         match read_message::<Message>(&mut net_handler) {
             Ok(msg) => {
-                println!("Server responded with: {}", msg.text);
+                println!("Server responded with: {}", msg.unwrap().text);
                 //Shutting down Handel
                 NetHandler::close_handel(&mut net_handler).expect("Failed to close handel");
                 //exiting Loop and program
