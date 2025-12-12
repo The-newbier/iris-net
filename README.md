@@ -23,32 +23,34 @@ cargo add iris_net bincode
 
 ## Example
 ### Server
+
 ````rust
 use iris_net::*;
 use iris_net::config::IrisNetworkConfig;
 
 fn main() {
-    //Creating new Server
-    let config = IrisNetworkConfig::default();
-    let net_handler =
-        NetHandler::new_server(config, "127.0.0.1:5000").expect("Failed to create server");
-    //register manage_data so that it can be multithreaded by the api
-    registered_fn_manage_data_on_server(manage_data, net_handler)
-        .expect("Failed to register data manager");
+  //Creating new Server
+  let config = IrisNetworkConfig::default();
+  let net_handler =
+          NetHandler::new_server(config, "127.0.0.1:5000").expect("Failed to create server");
+  //register manage_data so that it can be multithreaded by the api
+  registered_fn_manage_data_on_server(manage_data, net_handler)
+          .expect("Failed to register data manager");
 }
 
 //Message Format
 #[derive(bincode::Encode, bincode::Decode, Debug, Clone, PartialEq)]
 struct Message {
-    text: String,
+  text: String,
 }
 
 //Function for managing data. It needs to return the same type as the Function has got
-fn manage_data(msg: Message) -> Message {
-    println!("Client Response: {:?}", msg);
-    Message {
-        text: "Pong".to_string(),
-    }
+fn manage_data(msg: Message, metadata: ClientMetadata) -> Message {
+  println!("Client Response: {:?}", msg);
+  println!("Received from {}", metadata.ip);
+  Message {
+    text: "Pong".to_string(),
+  }
 }
 ````
 ### Client

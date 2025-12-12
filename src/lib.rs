@@ -201,7 +201,7 @@ pub fn read_message<'a, T: bincode::Decode<()>>(
 pub fn registered_fn_manage_data_on_server<
     T: bincode::Decode<()> + bincode::Encode + 'static + Clone + PartialEq,
 >(
-    f: fn(T) -> T,
+    f: fn(T, ClientMetadata) -> T,
     mut handler: NetHandler,
 ) -> Result<(), String> {
     let listener = handler.listener.take().ok_or("no listener")?;
@@ -227,7 +227,10 @@ pub fn registered_fn_manage_data_on_server<
                         if msg == None {
                             break;
                         }
-                        let reply = f(msg.expect("Failed to unwrap"));
+                        let metadata = ClientMetadata {
+                            ip: h.stream.as_ref().unwrap().local_addr().unwrap().to_string()
+                        };
+                        let reply = f(msg.expect("Failed to unwrap"), metadata);
 
                         if let Err(e) = send_message(&mut h, reply) {
                             eprintln!("Send error: {}", e);
@@ -240,4 +243,8 @@ pub fn registered_fn_manage_data_on_server<
         }
     }
     Ok(())
+}
+
+pub struct ClientMetadata {
+    ip: String,
 }
