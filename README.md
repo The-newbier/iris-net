@@ -45,7 +45,7 @@ struct Message {
 }
 
 //Function for managing data. It needs to return the same type as the Function has got
-fn manage_data(msg: Message, metadata: ClientMetadata) -> Message {
+fn manage_data(msg: Message, metadata: IrisNetMetadata) -> Message {
   println!("Client Response: {:?}", msg);
   println!("Received from {}", metadata.ip);
   Message {
