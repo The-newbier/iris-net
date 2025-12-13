@@ -246,6 +246,5 @@ pub fn add_server_data_manager<
 }
 
 pub struct IrisNetMetadata {
-    #[allow(unused)]
-    ip: String,
+    pub ip: String,
 }
