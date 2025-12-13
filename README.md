@@ -34,7 +34,7 @@ fn main() {
   let net_handler =
           NetHandler::new_server(config, "127.0.0.1:5000").expect("Failed to create server");
   //register manage_data so that it can be multithreaded by the api
-  registered_fn_manage_data_on_server(manage_data, net_handler)
+  add_server_data_manager(manage_data, net_handler)
           .expect("Failed to register data manager");
 }
 
@@ -61,7 +61,7 @@ fn main() {
     //Creating Client
     let config = IrisNetworkConfig::default();
     let mut net_handler =
-        NetHandler::new_client(config, "127.0.0.1:5000").expect("Failed to connect to server");
+        IrisNetHandler::new_client(config, "127.0.0.1:5000").expect("Failed to connect to server");
     //Sending Message in the Format-Type `Message`-Struct
     send_message(
         &mut net_handler,
@@ -76,7 +76,7 @@ fn main() {
             Ok(msg) => {
                 println!("Server responded with: {}", msg.unwrap().text);
                 //Shutting down Handel
-                NetHandler::close_handel(&mut net_handler).expect("Failed to close handel");
+                IrisNetHandler::close_handel(&mut net_handler).expect("Failed to close handel");
                 //exiting Loop and program
                 break;
             }

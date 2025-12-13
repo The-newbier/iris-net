@@ -4,18 +4,18 @@ use crate::config::{Endian, IrisNetworkConfig, SizeType};
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 
-pub struct NetHandler {
+pub struct IrisNetHandler {
     pub stream: Option<TcpStream>,
     pub listener: Option<TcpListener>,
     pub config: IrisNetworkConfig,
 }
 
-impl NetHandler {
+impl IrisNetHandler {
     /// creates a new Client and returns a Network handle or an Error
     pub fn new_client(
         config: IrisNetworkConfig,
         url: impl Into<String>,
-    ) -> Result<NetHandler, String> {
+    ) -> Result<IrisNetHandler, String> {
         let stream = match TcpStream::connect(url.into()) {
             Ok(stream) => stream,
             Err(e) => return Err(format!("Could not connect `404`; {}", e.to_string())),
@@ -30,7 +30,7 @@ impl NetHandler {
     pub fn new_server(
         config: IrisNetworkConfig,
         url: impl Into<String>,
-    ) -> Result<NetHandler, String> {
+    ) -> Result<IrisNetHandler, String> {
         let bind = match TcpListener::bind(url.into()) {
             Ok(stream) => stream,
             Err(e) => return Err("Failed to bind Url".to_string() + &*e.to_string()),
@@ -54,7 +54,7 @@ impl NetHandler {
 }
 /// This Function sends Messages
 pub fn send_message<T: bincode::Encode + Clone>(
-    net_handler: &mut NetHandler,
+    net_handler: &mut IrisNetHandler,
     content: T,
 ) -> Result<(), String> {
     let encoded = match net_handler.config.endian.clone() {
@@ -107,7 +107,7 @@ pub fn send_message<T: bincode::Encode + Clone>(
 }
 /// This Function reads if there are any Messages in the Inbox
 pub fn read_message<'a, T: bincode::Decode<()>>(
-    net_handler: &mut NetHandler,
+    net_handler: &mut IrisNetHandler,
 ) -> Result<Option<T>, String> {
     let stream = net_handler.stream.as_mut().ok_or("No Stream available")?;
     let mut buf_u16 = [0u8; 2];
@@ -178,9 +178,9 @@ pub fn read_message<'a, T: bincode::Decode<()>>(
 ///     //Creating new Server
 ///     let config = IrisNetworkConfig::default();
 ///     let net_handler =
-///         NetHandler::new_server(config, "127.0.0.1:5000").expect("Failed to create server");
+///         IrisNetHandler::new_server(config, "127.0.0.1:5000").expect("Failed to create server");
 ///     //register manage_data so that it can be multithreaded by the api
-///     registered_fn_manage_data_on_server(manage_data, net_handler)
+///     add_server_data_manager(manage_data, net_handler)
 ///         .expect("Failed to register data manager");
 /// }
 ///
@@ -198,11 +198,11 @@ pub fn read_message<'a, T: bincode::Decode<()>>(
 ///     }
 /// }
 /// ```
-pub fn registered_fn_manage_data_on_server<
+pub fn add_server_data_manager<
     T: bincode::Decode<()> + bincode::Encode + 'static + Clone + PartialEq,
 >(
-    f: fn(T, ClientMetadata) -> T,
-    mut handler: NetHandler,
+    f: fn(T, IrisNetMetadata) -> T,
+    mut handler: IrisNetHandler,
 ) -> Result<(), String> {
     let listener = handler.listener.take().ok_or("no listener")?;
     for stream in listener.incoming() {
@@ -210,7 +210,7 @@ pub fn registered_fn_manage_data_on_server<
             Ok(s) => {
                 println!("New connection: {}", s.peer_addr().unwrap());
                 std::thread::spawn(move || {
-                    let mut h = NetHandler {
+                    let mut h = IrisNetHandler {
                         stream: Some(s),
                         listener: None,
                         config: handler.config,
@@ -227,7 +227,7 @@ pub fn registered_fn_manage_data_on_server<
                         if msg == None {
                             break;
                         }
-                        let metadata = ClientMetadata {
+                        let metadata = IrisNetMetadata {
                             ip: h.stream.as_ref().unwrap().local_addr().unwrap().to_string()
                         };
                         let reply = f(msg.expect("Failed to unwrap"), metadata);
@@ -245,6 +245,7 @@ pub fn registered_fn_manage_data_on_server<
     Ok(())
 }
 
-pub struct ClientMetadata {
+pub struct IrisNetMetadata {
+    #[allow(unused)]
     ip: String,
 }
